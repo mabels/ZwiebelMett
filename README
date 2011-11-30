@@ -1,0 +1,15 @@
+This is ZwiebelMett
+
+it give you a Runtime which allows you to Register 
+Doclets once per Page.
+This Doclets are able to create Containers which has 
+a instance.
+The Doclet could bind a Container than the Container does
+not have any instance.
+
+Currently please use the source luke -:)
+
+thx
+S2
+sven w.
+KnisterPeter

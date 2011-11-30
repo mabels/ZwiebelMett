@@ -1,0 +1,200 @@
+<html>
+<head>
+<title>ZwiebelMett Framework Tester</title>
+<style type="text/css">
+
+#ZwiebelMettTestFrame .log { color: green; }
+#ZwiebelMettTestFrame .error { color: red; }
+</style>
+</head>
+<body>
+
+<h1>ZwiebelMett Framework Tester</h1>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js" type="text/javascript"></script>
+<script src="ZwiebelMett.js" type="text/javascript"></script>
+<script type="text/javascript">
+ZwiebelMett.Container("BindTestContainer", {
+  testValue: 4711,
+  bind: function(container) {
+    if (container) {
+      this.testValue = container + 1
+    }
+  },
+  test: function(tf) {
+    tf.pushContext("BindTestContainer");
+    ZwiebelMett.Container("BindTestContainer").bind(4713);
+    tf.assertEQ(this.testValue, 4714)
+
+    ZwiebelMett.Container("BindTestContainer").bind();
+    tf.pushContext("BindTestContainer");
+    tf.assertEQ(this.testValue, 4714)
+    tf.popContext()
+  }
+})
+
+ZwiebelMett.Container("CreateTestContainer", {
+  testValue: 4711,
+  bind: function(container) {
+    if (container) {
+      this.testValue += 1
+    }
+  },
+  test: function(tf) {
+    var cont1 = ZwiebelMett.Container("CreateTestContainer").create("#cont1");
+    tf.pushContext("CreateTestContainer");
+    tf.assertEQ(cont1.testValue, 4712)
+
+
+    var cont2 = ZwiebelMett.Container("CreateTestContainer").create("#cont2");
+    tf.pushContext("CreateTestContainer");
+    tf.assertEQ(cont2.testValue, 4712)
+
+    tf.assertEQ($("#cont1").data("Container").CreateTestContainer.container.testValue, 4712);
+    tf.assertEQ($("#cont2").data("Container").CreateTestContainer.container.testValue, 4712);
+
+    cont1.testValue = "cont1"
+    tf.assertEQ($("#cont1").data("Container").CreateTestContainer.container.testValue, "cont1");
+    tf.assertEQ($("#cont2").data("Container").CreateTestContainer.container.testValue, 4712);
+
+    cont2.testValue = "cont2"
+    tf.assertEQ($("#cont1").data("Container").CreateTestContainer.container.testValue, "cont1");
+    tf.assertEQ($("#cont2").data("Container").CreateTestContainer.container.testValue, "cont2");
+
+    tf.assertEQEQ($("#cont1").data("Container").CreateTestContainer.container, cont1);
+    tf.assertEQEQ($("#cont2").data("Container").CreateTestContainer.container, cont2);
+
+    tf.popContext()
+  }
+})
+
+</script>
+<div class="ZwiebelMettData"><!-- { "index" : "page" } --></div>
+<script src="ZwiebelMett.testFrame.js" type="text/javascript"></script>
+
+<div id="cont1"></div>
+<div id="cont2"></div>
+
+<script type="text/javascript">
+  ZwiebelMett.Doclet("AjaxDing", {
+    bindHistory: [], 
+    bind: function() {
+      this.bindHistory.push(arguments)
+    },
+    test: function(tf) {
+      var self = this;
+      tf.pushContext("Doclet:AjaxDing")
+      ZwiebelMett.Ajax("partial.html", {
+        success: function(data) {
+          var $data = $("<div />").append($(data));
+          var $testBlocks = $data.find(".TestBlocks")
+          tf.assertEQ($testBlocks.length, 2);
+          ZwiebelMett.Ajax.partial("partial.html", {
+            filter: function($partial) {
+              tf.assertEQ($partial.hasClass("ZwiebelMettAjax"), true)
+              var $testBlocks = $data.find(".TestBlocks")
+              tf.assertEQ($testBlocks.length, 2);
+            },
+            success: function(partial) {
+              var $partial = $("<div />").append($(partial));
+              tf.assertEQ(self.bindHistory[0][1], false)
+              var history = self.bindHistory[self.bindHistory.length-1]
+              tf.assertEQ(history[1], true)
+              tf.assertEQ($(history[0]).hasClass("ZwiebelMettAjax"), true)
+              tf.assertEQ($partial.hasClass("ZwiebelMettAjax"), false);
+              tf.popContext();
+            }
+          })
+        }
+      })
+    }
+  })
+  
+  ZwiebelMett.Doclet("MessageTest", {
+    testEvent: null,
+    testData: null,
+	bind: function(event, data) {
+      this.testEvent = event;
+      this.testData = data;
+    },
+    test: function(tf) {
+      var self = this;
+      
+      // normal messages
+      tf.pushContext("Doclet:MessageTest");
+      ZwiebelMett.Message.sub("testEvent", function(event, data){
+    	  self.bind(event, data);
+      });
+      
+      var data = {test: 12};
+      ZwiebelMett.Message.pub("testEvent", data);
+      
+      tf.assertEQ(this.testEvent.type, "testEvent");
+      tf.assertEQEQ(this.testData, data);
+      tf.popContext();
+      
+      // Message Namespacing, Doclets
+      tf.pushContext("Doclet:MessageNameSpace");
+      var doclet = ZwiebelMett.Doclet("MessageNamespace", {
+        bind: function(){},
+        f: function(event, data){
+          self.testEvent = event;
+          self.testData = data;
+        }        
+      });
+      doclet.message("testEvent").sub(function(event, data){
+        doclet.doclet.f(event, data)
+      });
+      doclet.message("testEvent").pub(data);
+      
+      tf.assertEQ(this.testEvent.type, "Doclet:MessageNamespace:testEvent");
+      tf.assertEQEQ(this.testData, data);
+      tf.popContext();
+      
+	  // Message Namespacing, Container (bind)
+      tf.pushContext("Container:MessageNameSpaceBind");
+      var cont = ZwiebelMett.Container("MessageNamespaceBind", {
+        bind: function(){},
+        f: function(event, data){
+          self.testEvent = event;
+          self.testData = data;
+        }        
+      });
+      cont.bind();
+      
+      cont.container.message("testEvent").sub(function(event, data){
+        cont.container.f(event, data)
+      });
+      cont.container.message("testEvent").pub(data);
+      
+      tf.assertEQ(this.testEvent.type, "Container:MessageNamespaceBind:testEvent");
+      tf.assertEQEQ(this.testData, data);
+      tf.popContext();
+      
+   	  // Message Namespacing, Container (create)
+      tf.pushContext("Container:MessageNameSpaceCreate");
+      var cont = ZwiebelMett.Container("MessageNamespaceCreate", {
+        bind: function(){},
+        f: function(event, data){
+          self.testEvent = event;
+          self.testData = data;
+        }        
+      });
+      cont = cont.create();
+      
+      cont.container.message("testEvent").sub(function(event, data){
+        cont.container.f(event, data)
+      });
+      cont.container.message("testEvent").pub(data);
+      
+      tf.assertEQ(this.testEvent.type, "Container:MessageNamespaceCreate:testEvent");
+      tf.assertEQEQ(this.testData, data);
+      tf.popContext();
+    }
+  })
+  
+  ZwiebelMett.Test();
+</script>
+
+
+</body>
+</html>
